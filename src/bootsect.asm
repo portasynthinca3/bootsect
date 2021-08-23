@@ -71,7 +71,7 @@ irq0:
     .no_overflow:
     mov ax, word [clock_ms]
 
-    ; shift top foam row and the fish right on every 250th ms
+    ; shift top foam row right on every 250th ms
     cmp ax, 250
     jne .nostr
     mov bx, 128
