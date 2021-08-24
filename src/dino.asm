@@ -1,8 +1,12 @@
 org 0x7c00
 use16
 
-%define clock_ms 0x7e00 ; in RAM right after the boot sector
-%define dino_vel 0x7e04
+%define var_base 0x7e00 ; in RAM right after the boot sector
+%define var(X)   [bp+(X)]
+
+%define clock_ms   0x0000
+%define beep_start 0x0004
+%define dino_vel   0x0008
 
 %define bg_color 0x1e
 %define fg_color 0x18
@@ -42,8 +46,9 @@ entry:
         loop .dot
 
     ; initialize vars
-    ; mov dword [clock_ms], 0 ; commenting these out is a dirty hack!
-    ; mov byte [dino_vel], 0  ;
+    mov bp, var_base
+    ; mov dword var(clock_ms), 0 ; commenting these out is a dirty hack!
+    ; mov byte var(dino_vel), 0  ;
 
     ; set PIT channel 2 (PC speaker) frequency (250Hz)
     mov al, 0xb6
@@ -68,14 +73,23 @@ entry:
 dino_y: dw 136 ; not a %define because it needs to be initalized
 
 irq0:
+    ; stop the sound 20ms after it started
+    mov eax, dword var(clock_ms)
+    sub eax, 20
+    cmp eax, dword var(beep_start)
+    jl .nosoundstop
+    xor al, al
+    out 0x61, al
+    .nosoundstop:
+
     ; clear dino at old position
     mov si, dino_sprite
     mov dl, bg_color
     mov bx, 20
-    mov dh, byte [dino_y]
+    mov dh, byte var(dino_y)
     call draw_sprite
 
-    ; shift cacti and ground to the left every 6ms
+    ; shift cacti and ground to the left every 7ms
     mov cx, 7
     mov bx, .ground_cont
     call test_ms
@@ -102,22 +116,19 @@ irq0:
     call draw_sprite
     .cactus_cont:
 
-    ; update dino position and stop sound every 30ms
+    ; update dino position every 30ms
     mov cx, 30
     mov bx, .noupd
     call test_ms
-    ; stop sound
-    xor al, al
-    out 0x61, al
     ; update pos
-    mov al, byte [dino_vel]
-    sub byte [dino_y], al
-    cmp byte [dino_y], 136
+    mov al, byte var(dino_vel)
+    sub byte var(dino_y), al
+    cmp byte var(dino_y), 136
     jae .nodown
-    sub byte [dino_vel], 1
+    sub byte var(dino_vel), 1
     jmp .noupd
     .nodown:
-    mov byte [dino_y], 136
+    mov byte var(dino_y), 136
     .noupd:
 
     ; check keypress
@@ -128,16 +139,18 @@ irq0:
     xor ah, ah
     int 16h
     ; check dino pos
-    cmp byte [dino_y], 136
+    cmp byte var(dino_y), 136
     jne .nostroke
     ; make our dino jump up and play a sound
     mov al, 3
     out 0x61, al
-    mov byte [dino_vel], 7
+    mov byte var(dino_vel), 7
+    mov eax, dword var(clock_ms)
+    mov dword var(beep_start), eax
     .nostroke:
 
     ; check collision
-    mov bx, word [dino_y]
+    mov bx, word var(dino_y)
     mov ax, 320
     mul bx
     mov bx, ax
@@ -152,11 +165,11 @@ irq0:
     ; draw dino at new position
     mov si, dino_sprite
     mov bx, 20
-    mov dh, byte [dino_y]
+    mov dh, byte var(dino_y)
     call draw_sprite ; dl=fg_color
 
     ; advance clock
-    inc dword [clock_ms]
+    inc dword var(clock_ms)
 
     ; EOI
     mov al, 0x20
@@ -170,7 +183,7 @@ irq0:
 ; BX = address to jump to if the test failed
 ;      (if the test succeeded the subroutine returns)
 test_ms:
-    mov di, clock_ms
+    lea di, var(clock_ms)
     mov ax, word [di]
     mov dx, word [di+2]
     div cx
@@ -189,7 +202,7 @@ test_ms:
 shift_row_left:
     ; save regs
     push cx
-    pushf
+    pushf ; save because we need to check CF and mul below affects it
     ; calculate start of line
     mov ax, 320
     mul bx
@@ -202,7 +215,7 @@ shift_row_left:
     lea si, [di+1]
     rep movsb
     pop ds
-    ; wrap around (restore flags prematurely to check if we need to)
+    ; wrap around (restore flags prematurely to check if we actually need to)
     popf
     jnc .nowrap
     mov al, byte [es:di-319]
