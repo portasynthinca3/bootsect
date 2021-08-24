@@ -2,8 +2,7 @@ org 0x7c00
 use16
 
 %define clock_ms 0x7e00 ; in RAM right after the boot sector
-%define dino_y   0x7e04
-%define dino_vel 0x7e06
+%define dino_vel 0x7e04
 
 %define bg_color 0x1e
 %define fg_color 0x18
@@ -13,36 +12,39 @@ entry:
     mov ax, 0x13 ; also sets AH=0 as function selector
     int 10h
     ; set es = VGA buffer
-    mov ax, 0xa000
-    mov es, ax
+    push 0xa000
+    pop es
 
     ; fill screen
     mov cx, 320 * 200
-    xor di, di
+    ; xor di, di ; commenting this out is a dirty hack to shave off two bytes!
     mov al, bg_color
     rep stosb
 
     ; draw ground
-    mov dl, fg_color
-    mov si, ground_sprite
-    xor bx, bx
-    mov dh, 158
-    mov cx, 20
-    .ground:
-        call draw_sprite
-        add bx, 16
-        loop .ground
+    ; top line
+    mov di, 158 * 320
+    mov cx, 320
+    mov al, fg_color
+    rep stosb
+    ; random dots
+    mov cx, 320*4
+    .dot:
+        in al, 0x40 ; read PIT channel 0 for randomness
+        and al, 0x55
+        jz .black_dot
+        mov al, bg_color
+        jmp .dot_cont
+        .black_dot:
+        mov al, fg_color
+        .dot_cont:
+        stosb
+        loop .dot
 
     ; initialize vars
-    ; mov dword [clock_ms], 0
-    mov byte [dino_y], 136
-    ; mov byte [dino_vel], 0
+    ; mov dword [clock_ms], 0 ; commenting these out is a dirty hack!
+    ; mov byte [dino_vel], 0  ;
 
-    ; set PIT channel 0 frequency (1kHz)
-    mov ax, 1193182 / 1000
-    out 0x40, al
-    mov al, ah
-    out 0x40, al
     ; set PIT channel 2 (PC speaker) frequency (250Hz)
     mov al, 0xb6
     out 0x43, al
@@ -50,12 +52,20 @@ entry:
     out 0x42, al
     mov al, ah
     out 0x42, al
-    ; set IRQ0 handler
+
+    ; set PIT channel 0 frequency (1kHz)
+    mov ax, 1193182 / 1000
+    out 0x40, al
+    mov al, ah
+    out 0x40, al
+    ; set IRQ0 (PIT channel 0) handler
     mov ax, cs
     mov word [0x0022], ax
     mov word [0x0020], irq0
 
     jmp $
+
+dino_y: dw 136 ; not a %define because it needs to be initalized
 
 irq0:
     ; clear dino at old position
@@ -269,16 +279,6 @@ draw_sprite:
     popa
     ret
 
-ground_sprite: ; 17 bytes
-    db (2 << 5) | (6 << 0) ; 4 bytes (32px) wide, 6+2=8 bytes (8px) tall
-    db 11111111b, 11111111b
-    db 10000000b, 10000000b
-    db 00001000b, 01000000b
-    db 00000000b, 00000010b
-    db 00100000b, 00010000b
-    db 00000000b, 01000000b
-    db 00000001b, 01000000b
-    db 00000000b, 00000001b
 cactus_sprite: ; 11 bytes
     db (1 << 5) | (10 << 0)
     db 00001000b
