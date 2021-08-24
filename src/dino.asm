@@ -86,13 +86,12 @@ irq0:
     mov si, dino_sprite
     mov dl, bg_color
     mov bx, 20
-    mov dh, byte var(dino_y)
+    mov dh, byte [dino_y]
     call draw_sprite
 
-    ; shift cacti and ground to the left every 7ms
-    mov cx, 7
-    mov bx, .ground_cont
-    call test_ms
+    ; shift cacti and ground to the left
+    test byte var(clock_ms), 3
+    jnz .ground_cont
     ; shift cacti (no wrap-around)
     mov cx, 33
     mov bx, 125
@@ -105,10 +104,9 @@ irq0:
     call shift_rect_left
     .ground_cont:
 
-    ; draw new cacti every 750ms
-    mov cx, 750
-    mov bx, .cactus_cont
-    call test_ms
+    ; draw new cacti
+    test word var(clock_ms), 1023
+    jnz .cactus_cont
     mov si, cactus_sprite
     mov dl, fg_color
     mov bx, 304
@@ -116,19 +114,18 @@ irq0:
     call draw_sprite
     .cactus_cont:
 
-    ; update dino position every 30ms
-    mov cx, 30
-    mov bx, .noupd
-    call test_ms
+    ; update dino position
+    test byte var(clock_ms), 31
+    jnz .noupd
     ; update pos
     mov al, byte var(dino_vel)
-    sub byte var(dino_y), al
-    cmp byte var(dino_y), 136
+    sub byte [dino_y], al
+    cmp byte [dino_y], 136
     jae .nodown
     sub byte var(dino_vel), 1
     jmp .noupd
     .nodown:
-    mov byte var(dino_y), 136
+    mov byte [dino_y], 136
     .noupd:
 
     ; check keypress
@@ -139,7 +136,7 @@ irq0:
     xor ah, ah
     int 16h
     ; check dino pos
-    cmp byte var(dino_y), 136
+    cmp byte [dino_y], 136
     jne .nostroke
     ; make our dino jump up and play a sound
     mov al, 3
@@ -150,7 +147,7 @@ irq0:
     .nostroke:
 
     ; check collision
-    mov bx, word var(dino_y)
+    mov bx, word [dino_y]
     mov ax, 320
     mul bx
     mov bx, ax
@@ -165,7 +162,7 @@ irq0:
     ; draw dino at new position
     mov si, dino_sprite
     mov bx, 20
-    mov dh, byte var(dino_y)
+    mov dh, byte [dino_y]
     call draw_sprite ; dl=fg_color
 
     ; advance clock
@@ -175,24 +172,6 @@ irq0:
     mov al, 0x20
     out 0x20, al
     iret
-
-;description:
-; tests whether or not clock_ms % N == 0
-;input:
-; CX = N
-; BX = address to jump to if the test failed
-;      (if the test succeeded the subroutine returns)
-test_ms:
-    lea di, var(clock_ms)
-    mov ax, word [di]
-    mov dx, word [di+2]
-    div cx
-    cmp dx, 0
-    jne .fail
-    ret
-    .fail:
-        add sp, 2 ; dummy pop of the return address
-        jmp bx
 
 ;description:
 ; shifts a row of pixels to the left
