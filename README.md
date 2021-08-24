@@ -18,6 +18,6 @@ Displays a simple animation in 320x200 256-color mode
 ![demo](demo/screensaver.gif)
 
 ## Dino
-Built-in Chrom dino game in 320x200 256-color mode
+Built-in Chrome dino game in 320x200 256-color mode
 
 ![demo](demo/dino.gif)
