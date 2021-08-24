@@ -82,12 +82,12 @@ irq0:
     ; shift cacti (no wrap-around)
     mov cx, 33
     mov bx, 125
-    xor dx, dx
+    clc
     call shift_rect_left
     ; shift ground (wrap around)
     mov cx, 8
     mov bx, 158
-    inc dx
+    stc
     call shift_rect_left
     .ground_cont:
 
@@ -185,11 +185,11 @@ test_ms:
 ; shifts a row of pixels to the left
 ;input:
 ; BX = Y position
-; DX = whether or not to wrap around (0 = false, 1..255 = true)
+; CF = whether or not to wrap around (0 = false, 1 = true)
 shift_row_left:
     ; save regs
     push cx
-    push dx
+    pushf
     ; calculate start of line
     mov ax, 320
     mul bx
@@ -202,10 +202,9 @@ shift_row_left:
     lea si, [di+1]
     rep movsb
     pop ds
-    ; wrap around (restore DX prematurely to check if we need to)
-    pop dx
-    cmp dx, 0
-    je .nowrap
+    ; wrap around (restore flags prematurely to check if we need to)
+    popf
+    jnc .nowrap
     mov al, byte [es:di-319]
     mov byte [es:di], al
     .nowrap:
