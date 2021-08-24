@@ -28,7 +28,7 @@ entry:
     mov al, fg_color
     rep stosb
     ; random dots
-    mov cx, 320*4
+    mov cx, 320*7
     .dot:
         in al, 0x40 ; read PIT channel 0 for randomness
         and al, 0x55
