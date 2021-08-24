@@ -58,7 +58,6 @@ entry:
     mov word [0x0022], ax
     mov word [0x0020], irq0
 
-infloop:
     jmp $
 
 irq0:
@@ -137,11 +136,11 @@ irq0:
     mov bx, ax
     mov dl, fg_color
     cmp byte [fs:bx+(13*320)+34], dl
-    je infloop
+    je $
     cmp byte [fs:bx+(15*320)+33], dl
-    je infloop
+    je $
     cmp byte [fs:bx+(18*320)+32], dl
-    je infloop
+    je $
 
     ; draw dino at new position
     mov si, dino_sprite
