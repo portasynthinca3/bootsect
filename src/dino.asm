@@ -10,20 +10,17 @@ use16
 
 entry:
     ; set video mode 13h (https://ibm.retropc.se/video/bios_video_modes.html)
-    xor ah, ah
-    mov al, 13h
+    mov ax, 0x13 ; also sets AH=0 as function selector
     int 10h
-    ; set fs = VGA buffer
+    ; set es = VGA buffer
     mov ax, 0xa000
-    mov fs, ax
+    mov es, ax
 
     ; fill screen
     mov cx, 320 * 200
     xor di, di
-    .iter:
-        mov byte [fs:di], bg_color
-        inc di
-        loop .iter
+    mov al, bg_color
+    rep stosb
 
     ; draw ground
     mov dl, fg_color
@@ -69,7 +66,7 @@ irq0:
     call draw_sprite
 
     ; shift cacti and ground to the left every 6ms
-    mov cx, 6
+    mov cx, 7
     mov bx, .ground_cont
     call test_ms
     ; shift cacti (no wrap-around)
@@ -135,11 +132,11 @@ irq0:
     mul bx
     mov bx, ax
     mov dl, fg_color
-    cmp byte [fs:bx+(13*320)+34], dl
+    cmp byte [es:bx+(13*320)+34], dl
     je $
-    cmp byte [fs:bx+(15*320)+33], dl
+    cmp byte [es:bx+(15*320)+33], dl
     je $
-    cmp byte [fs:bx+(18*320)+32], dl
+    cmp byte [es:bx+(18*320)+32], dl
     je $
 
     ; draw dino at new position
@@ -190,16 +187,16 @@ shift_row_left:
     mov cx, 319
     ; do the thing
     .iter:
-        mov al, byte [fs:di+1]
-        mov byte [fs:di], al
+        mov al, byte [es:di+1]
+        mov byte [es:di], al
         inc di
         loop .iter
     ; wrap around (restore DX prematurely to check if we need to)
     pop dx
     cmp dx, 0
     je .nowrap
-    mov al, byte [fs:di-319]
-    mov byte [fs:di], al
+    mov al, byte [es:di-319]
+    mov byte [es:di], al
     .nowrap:
     ; restore regs
     pop cx
@@ -251,7 +248,7 @@ draw_sprite:
         .pixel:
             test ah, 0x80 ; test leftmost pixel
             jz .bg_pixel
-            mov byte [fs:di], dl ; foreground pixel
+            mov byte [es:di], dl ; foreground pixel
             .bg_pixel:
             shl ah, 1
             inc di
