@@ -1,10 +1,12 @@
 #!/usr/bin/env sh
 
-nasm -f bin -o build/boot.bin src/bootsect.asm
+rm -r build
+mkdir build
+nasm -f bin -o build/boot.bin src/$1.asm
 truncate -s 1474560 build/boot.bin
 
 qemu-system-x86_64 \
-    -name guest="screensaver",debug-threads=on \
+    -name guest="bootsect",debug-threads=on \
     -machine q35,accel=kvm,usb=off,vmport=off,dump-guest-core=off \
     -cpu IvyBridge-IBRS,ss=on,vmx=on,pcid=on,hypervisor=on,arat=on,tsc-adjust=on,umip=on,md-clear=on,stibp=on,arch-capabilities=on,ssbd=on,xsaveopt=on,ibpb=on,amd-ssbd=on,skip-l1dfl-vmentry=on \
     -m 32 \

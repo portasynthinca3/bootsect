@@ -1,7 +1,7 @@
 org 0x7c00
 use16
 
-%define clock_ms 0x7e00 ; in RAM right after the bootsector
+%define clock_ms 0x7e00 ; in RAM right after the boot sector
 
 entry:
     ; set video mode 13h (https://ibm.retropc.se/video/bios_video_modes.html)
