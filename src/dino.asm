@@ -196,11 +196,12 @@ shift_row_left:
     mov di, ax
     mov cx, 319
     ; do the thing
-    .iter:
-        mov al, byte [es:di+1]
-        mov byte [es:di], al
-        inc di
-        loop .iter
+    push ds
+    push es
+    pop ds
+    lea si, [di+1]
+    rep movsb
+    pop ds
     ; wrap around (restore DX prematurely to check if we need to)
     pop dx
     cmp dx, 0
@@ -254,7 +255,7 @@ draw_sprite:
     .chunk:
         ; read chunk
         mov ah, byte [si]
-        mov bp, 8
+        mov al, 8
         .pixel:
             test ah, 0x80 ; test leftmost pixel
             jz .bg_pixel
@@ -262,7 +263,7 @@ draw_sprite:
             .bg_pixel:
             shl ah, 1
             inc di
-            dec bp
+            dec al
             jnz .pixel
         inc si
         dec dh
