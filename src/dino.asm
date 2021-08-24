@@ -4,9 +4,12 @@ use16
 %define var_base 0x7e00 ; in RAM right after the boot sector
 %define var(X)   [bp+(X)]
 
-%define clock_ms   0x0000
-%define beep_start 0x0004
-%define dino_vel   0x0008
+%define clock_ms    0x0000
+%define beep_start  0x0004
+%define cactus_test 0x0008
+%define randomness  0x000A
+%define dino_vel    0x000C
+%define next_cactus 0x000D
 
 %define bg_color 0x1e
 %define fg_color 0x18
@@ -50,7 +53,16 @@ entry:
     ; mov dword var(clock_ms), 0 ; commenting these out is a dirty hack!
     ; mov byte var(dino_vel), 0  ;
 
-    ; set PIT channel 2 (PC speaker) frequency (250Hz)
+    ; read some randomness for the cactus rate selector
+    mov cx, 0xff
+    .rand_iter:
+        in al, 0x40
+        xor byte var(randomness), al
+        in al, 0x40
+        xor byte var(randomness+1), al
+        loop .rand_iter
+
+    ; set PIT channel 2 (PC speaker) frequency
     mov al, 0xb6
     out 0x43, al
     mov ax, 1193182 / 250
@@ -58,14 +70,14 @@ entry:
     mov al, ah
     out 0x42, al
 
-    ; set PIT channel 0 frequency (1kHz)
-    mov ax, 1193182 / 1000
+    ; set PIT channel 0 frequency
+    mov ax, 1193182 / 700
     out 0x40, al
     mov al, ah
     out 0x40, al
     ; set IRQ0 (PIT channel 0) handler
-    mov ax, cs
-    mov word [0x0022], ax
+    push cs
+    pop word [0x0022]
     mov word [0x0020], irq0
 
     jmp $
@@ -105,17 +117,27 @@ irq0:
     .ground_cont:
 
     ; draw new cacti
-    test word var(clock_ms), 1023
-    jnz .cactus_cont
+    mov eax, dword var(clock_ms)
+    cmp eax, dword var(next_cactus)
+    jl .cactus_cont
     mov si, cactus_sprite
     mov dl, fg_color
     mov bx, 304
     mov dh, 146
     call draw_sprite
+    ; choose next cactus value
+    ror word var(randomness), 2
+    xor ax, ax
+    mov al, byte var(randomness)
+    and al, 3
+    or al, 4
+    shl ax, 7
+    add eax, dword var(clock_ms)
+    mov dword var(next_cactus), eax
     .cactus_cont:
 
     ; update dino position
-    test byte var(clock_ms), 31
+    test byte var(clock_ms), 15
     jnz .noupd
     ; update pos
     mov al, byte var(dino_vel)
@@ -141,10 +163,17 @@ irq0:
     ; make our dino jump up and play a sound
     mov al, 3
     out 0x61, al
-    mov byte var(dino_vel), 7
+    mov byte var(dino_vel), 8
     mov eax, dword var(clock_ms)
     mov dword var(beep_start), eax
     .nostroke:
+
+    ; draw dino at new position
+    mov dl, fg_color
+    mov si, dino_sprite
+    mov bx, 20
+    mov dh, byte [dino_y]
+    call draw_sprite
 
     ; check collision
     mov bx, word [dino_y]
@@ -152,18 +181,10 @@ irq0:
     mul bx
     mov bx, ax
     mov dl, fg_color
-    cmp byte [es:bx+(13*320)+34], dl
-    je $
     cmp byte [es:bx+(15*320)+33], dl
     je $
     cmp byte [es:bx+(18*320)+32], dl
     je $
-
-    ; draw dino at new position
-    mov si, dino_sprite
-    mov bx, 20
-    mov dh, byte [dino_y]
-    call draw_sprite ; dl=fg_color
 
     ; advance clock
     inc dword var(clock_ms)
