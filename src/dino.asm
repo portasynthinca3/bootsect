@@ -15,6 +15,11 @@ use16
 %define fg_color 0x18
 
 entry:
+    ; archos bios is bad
+    jmp 0x000:0x7c05
+    push 0
+    pop ds
+
     ; set video mode 13h (https://ibm.retropc.se/video/bios_video_modes.html)
     mov ax, 0x13 ; also sets AH=0 as function selector
     int 10h
@@ -38,7 +43,7 @@ entry:
     mov cx, 320*7
     .dot:
         in al, 0x40 ; read PIT channel 0 for randomness
-        and al, 0x55
+        and al, 0xee
         jz .black_dot
         mov al, bg_color
         jmp .dot_cont
@@ -54,13 +59,13 @@ entry:
     ; mov byte var(dino_vel), 0  ;
 
     ; read some randomness for the cactus rate selector
-    mov cx, 0xff
-    .rand_iter:
-        in al, 0x40
-        xor byte var(randomness), al
-        in al, 0x40
-        xor byte var(randomness+1), al
-        loop .rand_iter
+    ; mov cx, 0xff
+    ; .rand_iter:
+    ;     in al, 0x40
+    ;     xor byte var(randomness), al
+    ;     in al, 0x40
+    ;     xor byte var(randomness+1), al
+    ;     loop .rand_iter
 
     ; set PIT channel 2 (PC speaker) frequency
     mov al, 0xb6
@@ -71,6 +76,8 @@ entry:
     out 0x42, al
 
     ; set PIT channel 0 frequency
+    ; mov al, 0b00110100
+    ; out 0x43, al
     mov ax, 1193182 / 700
     out 0x40, al
     mov al, ah
@@ -79,6 +86,10 @@ entry:
     push cs
     pop word [0x0022]
     mov word [0x0020], irq0
+    ; configure PIC IRQ0
+    ; in al, 0x21
+    ; and al, ~(1 << 0)
+    ; out 0x21, al
 
     jmp $
 
@@ -86,13 +97,13 @@ dino_y: dw 136 ; not a %define because it needs to be initalized
 
 irq0:
     ; stop the sound 20ms after it started
-    mov eax, dword var(clock_ms)
-    sub eax, 20
-    cmp eax, dword var(beep_start)
-    jl .nosoundstop
-    xor al, al
-    out 0x61, al
-    .nosoundstop:
+    ; mov eax, dword var(clock_ms)
+    ; sub eax, 20
+    ; cmp eax, dword var(beep_start)
+    ; jl .nosoundstop
+    ; xor al, al
+    ; out 0x61, al
+    ; .nosoundstop:
 
     ; clear dino at old position
     mov si, dino_sprite
@@ -126,12 +137,16 @@ irq0:
     mov dh, 146
     call draw_sprite
     ; choose next cactus value
-    ror word var(randomness), 2
-    xor ax, ax
+    ; ror word var(randomness), 2
+    xor eax, eax
+
+
+
     mov al, byte var(randomness)
     and al, 3
     or al, 4
     shl ax, 7
+    ; ax = (((byte)rnd & 0b11) | 0b100) << 7 = 0b0000001X_Y0000000
     add eax, dword var(clock_ms)
     mov dword var(next_cactus), eax
     .cactus_cont:

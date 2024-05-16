@@ -4,13 +4,17 @@ use16
 %define clock_ms 0x7e00 ; in RAM right after the boot sector
 
 entry:
+    jmp 0x000:0x7c05
+    push 0
+    pop ds
+
     ; set video mode 13h (https://ibm.retropc.se/video/bios_video_modes.html)
     xor ah, ah
     mov al, 13h
     int 10h
     ; set fs = VGA buffer
-    mov ax, 0xa000
-    mov fs, ax
+    push 0xa000
+    pop fs
 
     ; draw sky
     mov cx, 131
@@ -34,7 +38,7 @@ entry:
         add bx, 24
         loop .foam
     ; draw the remainder
-    mov cx, 1
+    mov cl, 1
     mov bx, 130
     call fill_portion
 
@@ -46,18 +50,17 @@ entry:
         mov si, word [fish_locations+di+1]
         mov bx, word [fish_locations+di+3]
         mov dh, byte [fish_locations+di+5]
-        add di, 6
+        add di, 5
         call draw_sprite
         loop .fish
 
     ; set PIT channel 0 frequency (1kHz)
     mov ax, 1193182 / 1000
     out 0x40, al
-    mov al, ah
+    mov al, ah ; inshallah
     out 0x40, al
     ; set IRQ0 handler
-    mov ax, cs
-    mov word [0x0022], ax
+    mov word [0x0022], 0
     mov word [0x0020], irq0
 
     jmp $
@@ -160,9 +163,7 @@ fill_portion:
 ; BX = Y position
 shift_row_right:
     ; save regs
-    push ax
-    push cx
-    push dx
+    pusha
     ; calculate end of line
     mov ax, 320
     inc bx
@@ -175,9 +176,7 @@ shift_row_right:
         mov byte [fs:di], al
         loop .iter
     ; restore regs
-    pop dx
-    pop cx
-    pop ax
+    popa
     ret
 
 ;description:
@@ -186,9 +185,7 @@ shift_row_right:
 ; BX = Y position
 shift_row_left:
     ; save regs
-    push ax
-    push cx
-    push dx
+    pusha
     ; calculate start of line
     mov ax, 320
     mul bx
@@ -203,9 +200,7 @@ shift_row_left:
     mov al, byte [fs:di-319]
     mov byte [fs:di], al
     ; restore regs
-    pop dx
-    pop cx
-    pop ax
+    popa
     ret
 
 ;description:
@@ -229,10 +224,7 @@ shift_rect_left:
 ; DL = foreground color
 draw_sprite:
     ; save regs
-    push si
-    push cx
-    push di
-    push ax
+    pusha
     ; calculate vmem offset
     mov al, dh
     mov cl, 160 ;
@@ -243,7 +235,7 @@ draw_sprite:
     ; read height into cx
     mov al, byte [si]
     movzx cx, al
-    and cx, 0xf
+    and cl, 0xf
     ; keep width in al
     shr al, 4
     inc si
@@ -279,10 +271,7 @@ draw_sprite:
 .return:
     pop ax
     ; restore regs
-    pop ax
-    pop di
-    pop cx
-    pop si
+    popa
     ret
 
 ; sprites
@@ -293,36 +282,57 @@ foam_sprite:
     db 11111111b, 11111111b, 11111111b
     db 00000000b, 00011111b, 11000000b
 small_fish:
-    db (3 << 4) | (6 << 0)
-    db 00111110b, 00001101b, 10000000b
-    db 01111111b, 11100111b, 00000000b
-    db 11011111b, 11111110b, 00000000b
-    db 11111111b, 11111100b, 00000000b
-    db 01111111b, 11111000b, 00000000b
-    db 00111111b, 11100000b, 00000000b
+    db (2 << 4) | (6 << 0)
+    db 00111110b, 00001101b
+    db 01111111b, 11100111b
+    db 11011111b, 11111110b
+    db 11111111b, 11111100b
+    db 01111111b, 11111000b
+    db 00111111b, 11100000b
 coralfish:
     db (1 << 4) | (8 << 0)
     db 00010000b
     db 00110010b
-    db 01110010b
+    db 01110110b
     db 10111110b
     db 11111110b
     db 01110110b
     db 00110010b
     db 00010000b
+bird:
+    db (1 << 4) | (3 << 0)
+    db 00000000b
+    db 00000000b
+    db 00000000b
 
 fish_locations:
-    db 10 ; length
-    dw small_fish, 54, 159
-    dw small_fish, 121, 143
-    dw small_fish, 252, 140
-    dw small_fish, 169, 157
-    dw small_fish, 78, 180
-    dw small_fish, 152, 176
-    dw coralfish, 92, 157
-    dw coralfish, 80, 138
-    dw coralfish, 217, 160
-    dw coralfish, 233, 173
+    db 13 ; length
+    dw small_fish, 54,
+        db 159
+    dw small_fish, 121,
+        db 143
+    dw small_fish, 252,
+        db 140
+    dw small_fish, 169,
+        db 157
+    dw small_fish, 78,
+        db 180
+    dw small_fish, 152,
+        db 176
+    dw small_fish, 300,
+        db 178
+    dw coralfish, 92,
+        db 157
+    dw coralfish, 80,
+        db 138
+    dw coralfish, 217,
+        db 160
+    dw coralfish, 233,
+        db 173
+    dw coralfish, 160,
+        db 160
+    dw coralfish, 291,
+        db 138
 
 times 510 - ($-$$) db 0 ; useless! all the code and data above fits in 510 bytes with no space to spare
 dw 0xAA55 ; boot sector signature

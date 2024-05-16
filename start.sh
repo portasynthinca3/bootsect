@@ -3,6 +3,8 @@
 rm -r build
 mkdir build
 nasm -f bin -o build/boot.bin src/$1.asm
+ndisasm -b 16 build/boot.bin
+hexdump -C build/boot.bin
 truncate -s 1474560 build/boot.bin
 
 qemu-system-i386 \
@@ -11,5 +13,5 @@ qemu-system-i386 \
     -overcommit mem-lock=off \
     -fda ./build/boot.bin \
     -monitor stdio \
-    -soundhw pcspk \
+    -display sdl \
     -s
